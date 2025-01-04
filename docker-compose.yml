@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: earthquake_web
+    volumes:
+      - ./earthquake_warning:/app/earthquake_warning:rw
+      - static_volume:/app/earthquake_warning/staticfiles:rw
+    expose:
+      - 8000
+    env_file:
+      - .env
+    environment:
+      - GUNICORN_WORKERS=3
+      - GUNICORN_WORKER_CLASS=gevent
+      - GUNICORN_THREADS=2
+      - GUNICORN_TIMEOUT=60
+      - GUNICORN_LOG_LEVEL=info
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:rw
+    env_file:
+      - .env
+    expose:
+      - 5432
+    user: postgres
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    restart: unless-stopped
+
+  nginx:
+    container_name: nginx
+    build: ./nginx
+    volumes:
+      - static_volume:/app/earthquake_warning/staticfiles:rw 
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    ports:
+      - "80:80"
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - frontend
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  redis:
+    image: redis:6-alpine
+    command: redis-server --appendonly yes
+    expose:
+      - 6379
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data:rw
+    restart: unless-stopped
+
+  celery:
+    build: .
+    command: celery -A earthquake_warning worker -l info
+    volumes:
+      - ./earthquake_warning:/app/earthquake_warning:rw
+      - static_volume:/app/earthquake_warning/staticfiles:rw
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A earthquake_warning inspect ping -d 'celery@$HOSTNAME'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    environment:
+      - C_FORCE_ROOT=true
+    restart: unless-stopped
+
+  celery-beat:
+    build: .
+    command: celery -A earthquake_warning beat -l info
+    volumes:
+      - ./earthquake_warning:/app/earthquake_warning:rw 
+      - static_volume:/app/earthquake_warning/staticfiles:rw
+    env_file:
+      - .env
+    
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A earthquake_warning inspect ping -d 'celery-beat@$HOSTNAME'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery:
+        condition: service_started
+    networks:
+      - backend
+    environment:
+      - C_FORCE_ROOT=true
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  static_volume:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge

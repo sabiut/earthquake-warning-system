@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+    {% load static %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Earthquake Warning System{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom Stylesheets -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    {% block extra_css %}
+  
+    {% endblock %}
+    
+</head>
+<body class="bg-gray-100 text-gray-900 flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">Earthquake Warning System</h1>
+            <nav>
+                <a href="/" class="px-4 py-2 hover:bg-blue-700 rounded">Dashboard</a>
+                <a href="/alerts" class="px-4 py-2 hover:bg-blue-700 rounded">Alerts</a>
+                <a href="/settings" class="px-4 py-2 hover:bg-blue-700 rounded">Settings</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Wrapper (flex-grow for full height) -->
+    <main class="container mx-auto px-4 py-6 flex-grow">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer (stuck at bottom) -->
+    <footer class="bg-gray-800 text-white p-4 text-center">
+        &copy; 2025 Earthquake Warning System. All rights reserved.
+    </footer>
+
+    <!-- JavaScript Files -->
+    <script>console.log("Checking earthquakeData in map.js:", earthquakeData);
+    </script>
+
+
+<script>
+    var earthquakeData = JSON.parse('{{ earthquake_data|escapejs }}');
+    console.log("Earthquake Data Injected in base.html:", earthquakeData);
+</script>
+    <!-- Load Leaflet.js -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    
+    <!-- Custom Map JavaScript -->
+    <script src="{% static 'earthquake_app/js/map.js' %}"></script>
+    <script src="{% static 'earthquake_app/js/dashboard.js' %}"></script>
+    {% block extra_js %}
+    
+    {% endblock %}
+    
+</body>
+</html>

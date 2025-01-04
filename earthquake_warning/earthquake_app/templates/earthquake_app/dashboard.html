@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+
+
+{% block content %}
+<link rel="stylesheet" href="https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png" />
+<div class="min-h-screen bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header Section -->
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-4xl font-bold text-gray-900">Earthquake Warning Dashboard</h1>
+                <p class="text-gray-600 mt-2">Real-time seismic activity monitoring and alerts</p>
+            </div>
+            <div class="text-sm text-gray-500">
+                Last updated: {{ last_update|default:"Never" }}
+            </div>
+        </div>
+        
+        <!-- Statistics Section -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all hover:shadow-md">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-gray-500 font-medium">Total Events (24h)</h3>
+                    <span class="text-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </span>
+                </div>
+                <p class="text-4xl font-bold text-gray-900 mt-4">{{ stats.total_24h }}</p>
+                <div class="text-sm text-gray-600 mt-2">
+                    {% if stats.total_24h_change > 0 %}
+                        <span class="text-green-600">+{{ stats.total_24h_change }}</span>
+                    {% else %}
+                        <span class="text-red-600">{{ stats.total_24h_change }}</span>
+                    {% endif %}
+                    from yesterday
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all hover:shadow-md">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-gray-500 font-medium">Average Magnitude</h3>
+                    <span class="text-yellow-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </span>
+                </div>
+                <p class="text-4xl font-bold text-gray-900 mt-4">{{ stats.avg_magnitude }}</p>
+                <p class="text-sm text-gray-600 mt-2">Richter scale</p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all hover:shadow-md">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-gray-500 font-medium">Active Alerts</h3>
+                    <span class="text-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </span>
+                </div>
+                <p class="text-4xl font-bold text-gray-900 mt-4">{{ stats.active_alerts }}</p>
+                <p class="text-sm text-gray-600 mt-2">Requiring attention</p>
+            </div>
+        </div>
+
+        <!-- Map Section -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-gray-900">Earthquake Map</h2>
+                <div class="flex space-x-2">
+                    <button class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Last 24h
+                    </button>
+                    <button class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Last Week
+                    </button>
+                    <button class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Last Month
+                    </button>
+                </div>
+            </div>
+            <div id="map" class="h-[600px] w-full rounded-lg bg-gray-100">
+                <!-- Map will be initialized here via JavaScript -->
+            </div>
+        </div>
+
+
+        <!-- Latest Earthquakes Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-xl font-semibold text-gray-900">Latest Earthquakes</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Magnitude</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Depth</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date/Time</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for earthquake in earthquakes %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ earthquake.place }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ earthquake.magnitude }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ earthquake.depth }} km</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ earthquake.time }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {% if earthquake.status == 'alert' %}
+                                        bg-red-100 text-red-800
+                                    {% elif earthquake.status == 'warning' %}
+                                        bg-yellow-100 text-yellow-800
+                                    {% else %}
+                                        bg-green-100 text-green-800
+                                    {% endif %}">
+                                    {{ earthquake.status|title }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-sm text-center text-gray-500">No earthquake data available</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    // Initialize map
+    function initializeMap() {
+        // Map initialization code here
+    }
+
+    // Update dashboard data
+    function updateDashboard() {
+        fetch('/api/dashboard-data')
+            .then(response => response.json())
+            .then(data => {
+                // Update dashboard elements
+            })
+            .catch(error => console.error('Error updating dashboard:', error));
+    }
+
+    // Initialize map when page loads
+    document.addEventListener('DOMContentLoaded', initializeMap);
+
+    // Refresh data every minute
+    setInterval(updateDashboard, 60000);
+</script>
+{% endblock %}
+{% endblock %}
