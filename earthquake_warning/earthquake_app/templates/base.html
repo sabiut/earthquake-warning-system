@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-    {% load static %}
+{% load static %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,56 +9,100 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Custom Stylesheets -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    {% block extra_css %}
-  
-    {% endblock %}
-    
-</head>
-<body class="bg-gray-100 text-gray-900 flex flex-col min-h-screen">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin="" />
 
+    <!-- Custom Styles -->
+    <style>
+        .leaflet-popup-content {
+            margin: 8px 12px;
+        }
+        .earthquake-popup h3 {
+            margin-bottom: 8px;
+            color: #1a202c;
+        }
+        .earthquake-popup p {
+            margin: 4px 0;
+            color: #4a5568;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body class="bg-gray-100 text-gray-900 flex flex-col min-h-screen">
     <!-- Header -->
-    <header class="bg-blue-600 text-white p-4">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold">Earthquake Warning System</h1>
-            <nav>
-                <a href="/" class="px-4 py-2 hover:bg-blue-700 rounded">Dashboard</a>
-                <a href="/alerts" class="px-4 py-2 hover:bg-blue-700 rounded">Alerts</a>
-                <a href="/settings" class="px-4 py-2 hover:bg-blue-700 rounded">Settings</a>
-            </nav>
+    <header class="bg-blue-600 text-white shadow-md">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <h1 class="text-xl font-bold">
+                    <a href="/" class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" 
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m12 14 4-4"/>
+                            <path d="m18 14 4-4"/>
+                            <path d="m6 14 4-4"/>
+                            <path d="M12 14c0 2.761-2.239 5-5 5s-5-2.239-5-5s2.239-5 5-5s5 2.239 5 5"/>
+                            <path d="M18 14c0 2.761-2.239 5-5 5s-5-2.239-5-5s2.239-5 5-5s5 2.239 5 5"/>
+                            <path d="M24 14c0 2.761-2.239 5-5 5s-5-2.239-5-5s2.239-5 5-5s5 2.239 5 5"/>
+                        </svg>
+                        Earthquake Warning System
+                    </a>
+                </h1>
+                <nav class="flex gap-2">
+                    <a href="/" class="px-4 py-2 hover:bg-blue-700 rounded transition-colors duration-200">Dashboard</a>
+                    <a href="{% url 'alerts' %}" class="px-4 py-2 hover:bg-blue-700 rounded inline-flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="red" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell-ring"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/><path d="M22 8c0-2.3-.8-4.3-2-6"/></svg>
+                        Alerts
+                    </a>
+                    <a href="/settings" class="px-4 py-2 hover:bg-blue-700 rounded transition-colors duration-200">Settings</a>
+                </nav>
+            </div>
         </div>
     </header>
 
-    <!-- Main Content Wrapper (flex-grow for full height) -->
-    <main class="container mx-auto px-4 py-6 flex-grow">
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-6">
+        {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+            <div class="p-4 rounded-lg {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer (stuck at bottom) -->
-    <footer class="bg-gray-800 text-white p-4 text-center">
-        &copy; 2025 Earthquake Warning System. All rights reserved.
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p>&copy; 2025 Earthquake Warning System. All rights reserved.</p>
+            <p class="text-sm text-gray-400 mt-2">Data provided by USGS Earthquake Hazards Program</p>
+        </div>
     </footer>
 
-    <!-- JavaScript Files -->
-    <script>console.log("Checking earthquakeData in map.js:", earthquakeData);
+    <!-- Earthquake Data Injection (Must come before map.js) -->
+    <script>
+        var earthquakeData = {% if earthquake_data %}JSON.parse('{{ earthquake_data|escapejs }}'){% else %}[]{% endif %};
+        console.log("✅ Earthquake Data Injected:", earthquakeData);
     </script>
 
+    <!-- Leaflet.js -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+            crossorigin=""></script>
 
-<script>
-    var earthquakeData = JSON.parse('{{ earthquake_data|escapejs }}');
-    console.log("Earthquake Data Injected in base.html:", earthquakeData);
-</script>
-    <!-- Load Leaflet.js -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    
-    <!-- Custom Map JavaScript -->
+    <!-- Custom JavaScript -->
     <script src="{% static 'earthquake_app/js/map.js' %}"></script>
     <script src="{% static 'earthquake_app/js/dashboard.js' %}"></script>
-    {% block extra_js %}
-    
-    {% endblock %}
-    
+
+    <!-- Extra JavaScript Blocks -->
+    {% block extra_js %}{% endblock %}
+
 </body>
 </html>

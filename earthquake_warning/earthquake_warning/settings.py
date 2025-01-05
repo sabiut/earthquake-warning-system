@@ -19,6 +19,7 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split('
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -29,6 +30,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_celery_beat',
     'earthquake_app',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -62,6 +64,17 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'earthquake_warning.wsgi.application'
+
+# Channel Layer (WebSockets) using Redis
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(os.getenv('REDIS_HOST', 'localhost'), 6379)],
+        },
+    },
+}
+
 
 # Database
 DATABASES = {
@@ -120,7 +133,7 @@ CELERY_TASK_ALWAYS_EAGER = DEBUG
 CELERY_BEAT_SCHEDULE = {
     'fetch_earthquake_data': {
         'task': 'earthquake_app.tasks.fetch_earthquake_data',
-        'schedule': timedelta(minutes=5),
+        'schedule': timedelta(minutes=10),
     },
 }
 

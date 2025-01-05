@@ -1,6 +1,8 @@
+# services.py
 import requests
 import logging
 from django.utils import timezone
+from django.db import transaction
 from .models import Earthquake
 
 logger = logging.getLogger(__name__)
@@ -11,80 +13,94 @@ class EarthquakeDataService:
     @classmethod
     def fetch_recent_earthquakes(cls):
         """
-        Fetch recent earthquakes from USGS API and store new ones in the database.
+        Fetch and store earthquakes from USGS API from the last 24 hours.
+        Implements error handling, data validation, and atomic transactions.
         """
         try:
+            # Fetch data from USGS API
             response = requests.get(cls.USGS_API_URL, timeout=10)
-            response.raise_for_status()  # Raise an error for HTTP errors
+            response.raise_for_status()
             data = response.json()
-
+            
             if 'features' not in data:
-                logger.warning("USGS API response is missing 'features' key.")
+                logger.error("Invalid API response: 'features' key missing")
                 return
-
+            
+            twenty_four_hours_ago = timezone.now() - timezone.timedelta(hours=24)
+            latest_earthquakes = []
+            
+            # Process earthquake data
             for feature in data['features']:
-                properties = feature['properties']
-                geometry = feature['geometry']
-                
-                if not properties.get('mag') or not properties.get('place') or not properties.get('time'):
-                    logger.warning(f"Skipping incomplete earthquake data: {feature}")
-                    continue
-
-                # Convert timestamp
-                timestamp = timezone.datetime.fromtimestamp(properties['time'] / 1000, timezone.utc)
-
-                # Check if earthquake already exists
-                existing_eq = Earthquake.objects.filter(usgs_id=feature['id']).exists()
-
-                if not existing_eq:
-                    earthquake = Earthquake.objects.create(
-                        usgs_id=feature['id'],
-                        magnitude=properties['mag'],
-                        place=properties['place'],
-                        time=timestamp,
-                        longitude=geometry['coordinates'][0],
-                        latitude=geometry['coordinates'][1],
-                        depth=geometry['coordinates'][2],
+                try:
+                    properties = feature['properties']
+                    geometry = feature['geometry']
+                    
+                    # Validate required fields
+                    required_fields = {
+                        'mag': properties.get('mag'),
+                        'place': properties.get('place'),
+                        'time': properties.get('time'),
+                        'coordinates': geometry.get('coordinates')
+                    }
+                    
+                    if None in required_fields.values():
+                        logger.warning(f"Skipping earthquake with missing data: {feature['id']}")
+                        continue
+                    
+                    # Convert timestamp to UTC
+                    timestamp = timezone.datetime.fromtimestamp(
+                        properties['time'] / 1000,
+                        timezone.utc
                     )
                     
-                    # Send alert if magnitude is high
-                    if earthquake.magnitude >= 4.5:
-                        #cls.send_earthquake_alert(earthquake)
-                        logger.info(f"Earthquake detected but email alert not sent: {earthquake}")
-
-            logger.info("Successfully fetched and saved recent earthquake data.")
-
+                    # Only include recent earthquakes
+                    if timestamp >= twenty_four_hours_ago:
+                        latest_earthquakes.append({
+                            'usgs_id': feature['id'],
+                            'magnitude': properties['mag'],
+                            'place': properties['place'],
+                            'time': timestamp,
+                            'longitude': geometry['coordinates'][0],
+                            'latitude': geometry['coordinates'][1],
+                            'depth': geometry['coordinates'][2],
+                        })
+                
+                except (KeyError, ValueError) as e:
+                    logger.error(f"Error processing earthquake feature: {e}")
+                    continue
+            
+            # Store earthquakes in a single transaction
+            with transaction.atomic():
+                stored_count = 0
+                for quake_data in latest_earthquakes:
+                    earthquake, created = Earthquake.objects.get_or_create(
+                        usgs_id=quake_data['usgs_id'],
+                        defaults=quake_data
+                    )
+                    if created:
+                        stored_count += 1
+                        logger.info(f"Stored new earthquake: {earthquake}")
+            
+            logger.info(f"Successfully processed {len(latest_earthquakes)} earthquakes. "
+                       f"Stored {stored_count} new records.")
+            
+            return latest_earthquakes
+            
         except requests.RequestException as e:
             logger.error(f"Error fetching earthquake data: {e}")
-    
-    @classmethod
-    def send_earthquake_alert(cls, earthquake):
-        """
-        Send email alerts for significant earthquakes.
-        """
-        from django.core.mail import send_mail
-        
-        subject = f"Earthquake Alert: {earthquake.place}"
-        message = f"""
-        Earthquake Detected:
-        Location: {earthquake.place}
-        Magnitude: {earthquake.magnitude}
-        Time: {earthquake.time}
-        Coordinates: {earthquake.latitude}, {earthquake.longitude}
-        """
-
-        # Replace these emails with actual recipients
-        recipients = ['authority1@example.com', 'authority2@example.com']
-
-        try:
-            send_mail(
-                subject,
-                message,
-                'earthquake_alerts@yourdomain.com',
-                recipients,
-                fail_silently=False,
-            )
-            logger.info(f"Sent earthquake alert for {earthquake.place}")
-
+            return None
         except Exception as e:
-            logger.error(f"Failed to send earthquake alert: {e}")
+            logger.error(f"Unexpected error in earthquake data service: {e}")
+            return None
+
+    @classmethod
+    def get_alerts(cls):
+        """
+        Return earthquakes that require alerts (magnitude >= 4.5) from the last 24 hours
+        """
+        twenty_four_hours_ago = timezone.now() - timezone.timedelta(hours=24)
+        return Earthquake.objects.filter(
+            time__gte=twenty_four_hours_ago,
+            magnitude__gte=4.5,
+            is_alert_sent=False
+        ).order_by('-magnitude')

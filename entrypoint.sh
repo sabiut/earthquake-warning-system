@@ -19,7 +19,7 @@ cd /app/earthquake_warning
 
 # Run Django management commands
 echo "Running Django management commands..."
-python manage.py collectstatic --noinput --clear
+python manage.py collectstatic --noinput 
 python manage.py migrate
 
 # Create superuser if not exists

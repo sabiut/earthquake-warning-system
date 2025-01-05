@@ -93,6 +93,7 @@ services:
 
   celery:
     build: .
+    working_dir: /app/earthquake_warning
     command: celery -A earthquake_warning worker -l info
     volumes:
       - ./earthquake_warning:/app/earthquake_warning:rw
@@ -107,42 +108,64 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "celery -A earthquake_warning inspect ping -d 'celery@$HOSTNAME'"]
+      test: ["CMD-SHELL", "cd /app/earthquake_warning && celery -A earthquake_warning inspect ping || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     environment:
       - C_FORCE_ROOT=true
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DJANGO_SETTINGS_MODULE=earthquake_warning.settings
+      - PYTHONPATH=/app
     restart: unless-stopped
 
   celery-beat:
     build: .
+    working_dir: /app/earthquake_warning
     command: celery -A earthquake_warning beat -l info
     volumes:
       - ./earthquake_warning:/app/earthquake_warning:rw 
       - static_volume:/app/earthquake_warning/staticfiles:rw
     env_file:
       - .env
-    
     healthcheck:
-      test: ["CMD-SHELL", "celery -A earthquake_warning inspect ping -d 'celery-beat@$HOSTNAME'"]
+      test: ["CMD-SHELL", "celery -A earthquake_warning status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
       celery:
-        condition: service_started
+        condition: service_healthy
+
     networks:
       - backend
     environment:
       - C_FORCE_ROOT=true
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DJANGO_SETTINGS_MODULE=earthquake_warning.settings
+      - PYTHONPATH=/app
     restart: unless-stopped
 
 volumes:
