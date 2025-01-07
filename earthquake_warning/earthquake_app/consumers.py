@@ -1,31 +1,21 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
-from .models import Earthquake
+from channels.layers import get_channel_layer
 from django.utils import timezone
 
 class EarthquakeConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        """Handles WebSocket connection and joins the update group."""
+        await self.channel_layer.group_add("earthquake_updates", self.channel_name)
         await self.accept()
         print("✅ WebSocket Connected")
 
     async def disconnect(self, close_code):
+        """Handles WebSocket disconnection and removes from group."""
+        await self.channel_layer.group_discard("earthquake_updates", self.channel_name)
         print("❌ WebSocket Disconnected")
 
-    async def receive(self, text_data):
-        """
-        Send real-time earthquake updates.
-        """
-        earthquakes = Earthquake.objects.filter(time__gte=timezone.now() - timezone.timedelta(days=1))
-        earthquake_data = [{
-            "latitude": eq.latitude,
-            "longitude": eq.longitude,
-            "magnitude": eq.magnitude,
-            "depth": eq.depth,
-            "place": eq.place,
-            "time": eq.time.isoformat(),
-            "status": eq.status,
-        } for eq in earthquakes]
-
-        await self.send(text_data=json.dumps({
-            "earthquakes": earthquake_data,
-        }))
+    async def send_earthquake_update(self, event):
+        """Sends earthquake updates to all connected WebSocket clients."""
+        earthquake = event["earthquake"]
+        await self.send(text_data=json.dumps(earthquake))

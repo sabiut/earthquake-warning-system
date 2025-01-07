@@ -5,7 +5,7 @@ services:
     build: .
     container_name: earthquake_web
     volumes:
-      - ./earthquake_warning:/app/earthquake_warning:rw
+      - .:/app:rw 
       - static_volume:/app/earthquake_warning/staticfiles:rw
     expose:
       - 8000
@@ -92,14 +92,30 @@ services:
     restart: unless-stopped
 
   celery:
-    build: .
-    working_dir: /app/earthquake_warning
-    command: celery -A earthquake_warning worker -l info
+    container_name: celery
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    working_dir: /app
+    command: celery -A earthquake_warning.earthquake_warning worker --loglevel=info
     volumes:
-      - ./earthquake_warning:/app/earthquake_warning:rw
-      - static_volume:/app/earthquake_warning/staticfiles:rw
+      - .:/app:rw 
     env_file:
-      - .env
+      - .env  # ✅ Load all environment variables from .env
+    
+    environment:
+    - C_FORCE_ROOT=true
+    - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+    - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+    - REDIS_HOST=${REDIS_HOST}
+    - REDIS_PORT=${REDIS_PORT}
+    - POSTGRES_HOST=${POSTGRES_HOST}
+    - POSTGRES_PORT=${POSTGRES_PORT}
+    - POSTGRES_DB=${POSTGRES_DB}
+    - POSTGRES_USER=${POSTGRES_USER}
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    - DJANGO_SETTINGS_MODULE=earthquake_warning.settings
+    - PYTHONPATH=/app
     depends_on:
       db:
         condition: service_healthy
@@ -107,52 +123,29 @@ services:
         condition: service_healthy
     networks:
       - backend
+   
     healthcheck:
-      test: ["CMD-SHELL", "cd /app/earthquake_warning && celery -A earthquake_warning inspect ping || exit 1"]
+      test: ["CMD-SHELL", "celery -A earthquake_warning.earthquake_warning inspect ping || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    environment:
-      - C_FORCE_ROOT=true
-      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
-      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - DJANGO_SETTINGS_MODULE=earthquake_warning.settings
-      - PYTHONPATH=/app
     restart: unless-stopped
 
   celery-beat:
-    build: .
-    working_dir: /app/earthquake_warning
-    command: celery -A earthquake_warning beat -l info
-    volumes:
-      - ./earthquake_warning:/app/earthquake_warning:rw 
-      - static_volume:/app/earthquake_warning/staticfiles:rw
-    env_file:
-      - .env
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A earthquake_warning status || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      celery:
-        condition: service_healthy
+    container_name: celerybeat
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    working_dir: /app
+    command: celery -A earthquake_warning.earthquake_warning beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 
-    networks:
-      - backend
+    volumes:
+      - .:/app:rw 
+      - celerybeat_schedule:/tmp/celerybeat-schedule
+    env_file:
+      - .env  # ✅ Load all environment variables from .env
+    
     environment:
       - C_FORCE_ROOT=true
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
@@ -166,7 +159,25 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - DJANGO_SETTINGS_MODULE=earthquake_warning.settings
       - PYTHONPATH=/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+     
+    networks:
+      - backend 
+  
+    
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A earthquake_warning.earthquake_warning beat --scheduler django_celery_beat.schedulers:DatabaseScheduler || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
     restart: unless-stopped
+
 
 volumes:
   postgres_data:
@@ -174,6 +185,8 @@ volumes:
   static_volume:
     driver: local
   redis_data:
+    driver: local
+  celerybeat_schedule:  # ✅ Persistent schedule for Celery Beat
     driver: local
 
 networks:
