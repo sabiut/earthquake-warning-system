@@ -1,17 +1,25 @@
 {% extends 'base.html' %}
 
+{% load static %}
+{% block title %}Dashboard - Earthquake Warning System{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png" />
 <div class="min-h-screen bg-gray-50">
     <div class="container mx-auto px-4 py-8">
-        <!-- Header Section -->
+        <!-- Header Section with Connection Status -->
         <div class="flex items-center justify-between mb-8">
             <div>
                 <h1 class="text-4xl font-bold text-gray-900">Earthquake Warning Dashboard</h1>
                 <p class="text-gray-600 mt-2">Real-time seismic activity monitoring and alerts</p>
             </div>
-            <div class="text-sm text-gray-500">
-                Last updated: {{ last_update|default:"Never" }}
+            <div class="flex items-center gap-4">
+                <div id="connection-status" class="flex items-center gap-2">
+                    <span class="h-2 w-2 rounded-full bg-gray-400"></span>
+                    <span class="text-sm text-gray-500">Connecting...</span>
+                </div>
+                <div class="text-sm text-gray-500">
+                    Last updated: <span id="last-update">{{ last_update|default:"Never" }}</span>
+                </div>
             </div>
         </div>
 
@@ -22,7 +30,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="m12 14 4-4"/><path d="m18 14 4-4"/><path d="m6 14 4-4"/><path d="M12 14c0 2.761-2.239 5-5 5s-5-2.239-5-5s2.239-5 5-5s5 2.239 5 5"/><path d="M18 14c0 2.761-2.239 5-5 5s-5-2.239-5-5s2.239-5 5-5s5 2.239 5 5"/><path d="M24 14c0 2.761-2.239 5-5 5s-5-2.239-5-5s2.239-5 5-5s5 2.239 5 5"/></svg>
                     <h3 class="text-gray-500 font-medium">Total Events (24h)</h3>
                 </div>
-                <p class="text-4xl font-bold text-gray-900 mt-4">{{ stats.total_24h }}</p>
+                <p id="total-events" class="text-4xl font-bold text-gray-900 mt-4">{{ stats.total_24h }}</p>
             </div>
             
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all hover:shadow-md">
@@ -30,7 +38,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><circle cx="12" cy="12" r="3"/><path d="M12 3v2"/><path d="M12 19v2"/><path d="m19 12 2 0"/><path d="m3 12 2 0"/><path d="m18.364 5.636-1.414 1.414"/><path d="m7.05 16.95-1.414 1.414"/><path d="m18.364 18.364-1.414-1.414"/><path d="m7.05 7.05-1.414-1.414"/></svg>
                     <h3 class="text-gray-500 font-medium">Average Magnitude</h3>
                 </div>
-                <p class="text-4xl font-bold text-gray-900 mt-4">{{ stats.avg_magnitude }}</p>
+                <p id="avg-magnitude" class="text-4xl font-bold text-gray-900 mt-4">{{ stats.avg_magnitude }}</p>
                 <p class="text-sm text-gray-600 mt-2">Richter scale</p>
             </div>
             
@@ -39,26 +47,34 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/><path d="M22 8c0-2.3-.8-4.3-2-6"/></svg>
                     <h3 class="text-gray-500 font-medium">Active Alerts</h3>
                 </div>
-                <p class="text-4xl font-bold text-gray-900 mt-4">{{ stats.active_alerts }}</p>
+                <p id="active-alerts" class="text-4xl font-bold text-gray-900 mt-4">{{ stats.active_alerts }}</p>
                 <p class="text-sm text-gray-600 mt-2">Requiring attention</p>
             </div>
         </div>
 
-        
-        <!-- Map Section -->
+        <!-- Map Section with Time Filter -->
         <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
-            <h2 class="text-xl font-semibold text-gray-900">Earthquake Map</h2>
-            <div class="flex flex-col h-[32rem]"> <!-- or h-128 - slightly taller than h-96 -->
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-900">Earthquake Map</h2>
+                <div class="flex space-x-2">
+                    <button onclick="filterMap('24h')" class="px-4 py-2 bg-gray-200 rounded-lg text-sm">24h</button>
+                    <button onclick="filterMap('week')" class="px-4 py-2 bg-gray-100 rounded-lg text-sm">Week</button>
+                    <button onclick="filterMap('month')" class="px-4 py-2 bg-gray-100 rounded-lg text-sm">Month</button>
+                </div>
+            </div>
+            <div class="flex flex-col h-[32rem] relative">
                 <div id="map" class="w-full h-full rounded-lg bg-gray-100"></div>
+                <div id="map-loading" class="absolute inset-0 bg-gray-50 bg-opacity-75 flex items-center justify-center hidden">
+                    <div class="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                </div>
             </div>
         </div>
         
         <!-- Latest Earthquakes Section -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-            <!-- Search Bar -->
             <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                 <h2 class="text-xl font-semibold text-gray-900">Latest Earthquakes</h2>
-                <input type="text" id="searchInput" placeholder="Search by country..." 
+                <input type="text" id="searchInput" placeholder="Search by location..." 
                        class="border border-gray-300 rounded-lg px-4 py-2 text-sm">
             </div>
 
@@ -104,51 +120,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const searchInput = document.getElementById('searchInput');
-    const tableBody = document.getElementById('earthquakeTableBody');
-    const rows = tableBody.getElementsByTagName('tr');
-
-    searchInput.addEventListener('input', function () {
-        const searchValue = this.value.toLowerCase();
-
-        for (let i = 0; i < rows.length; i++) {
-            const locationCell = rows[i].getElementsByTagName('td')[0];  // First column: Location
-            if (locationCell) {
-                const locationText = locationCell.textContent.toLowerCase();
-                if (locationText.includes(searchValue)) {
-                    rows[i].style.display = '';
-                } else {
-                    rows[i].style.display = 'none';
-                }
-            }
-        }
-    });
-});
-
-// Initialize map
-function initializeMap() {
-    console.log("Initializing map...");
-}
-
-// Update dashboard data
-function updateDashboard() {
-    fetch('/api/dashboard-data')
-        .then(response => response.json())
-        .then(data => {
-            console.log("Data updated:", data);
-        })
-        .catch(error => console.error('Error updating dashboard:', error));
-}
-
-// Initialize map when page loads
-document.addEventListener('DOMContentLoaded', initializeMap);
-
-// Refresh data every minute
-setInterval(updateDashboard, 60000);
-</script>
-{% endblock %}
+<!-- Already defined in base.html, no need to include Leaflet.js and other scripts -->
+<script src="{% static 'js/dashboard.js' %}"></script>
 {% endblock %}

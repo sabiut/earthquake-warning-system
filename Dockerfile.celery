@@ -24,7 +24,7 @@ COPY . .
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH="/app"
-ENV DJANGO_SETTINGS_MODULE="earthquake_warning.earthquake_warning.settings"
+
 
 # Make sure the module path matches your directory structure
-CMD ["celery", "-A", "earthquake_warning.earthquake_warning", "worker", "--loglevel=info"]
+CMD ["celery", "-A", "earthquake_warning", "worker", "--loglevel=info"]

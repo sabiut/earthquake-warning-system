@@ -101,16 +101,16 @@ CACHES = {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
             'SOCKET_CONNECT_TIMEOUT': 5,
             'SOCKET_TIMEOUT': 5,
-            'RETRY_ON_TIMEOUT': True,  # Retry on timeout
-            'MAX_CONNECTIONS': 100,    # Connection pool size
-            'CONNECTION_POOL_CLASS': 'redis.BlockingConnectionPool',  # Better for web apps
+            'RETRY_ON_TIMEOUT': True,
+            'MAX_CONNECTIONS': 100,
+            'CONNECTION_POOL_CLASS': 'redis.BlockingConnectionPool',
             'CONNECTION_POOL_CLASS_KWARGS': {
                 'max_connections': 50,
                 'timeout': 20,
             },
         },
-        'KEY_PREFIX': 'earthquake_',  # Prefix for cache keys
-        'TIMEOUT': 300,  # Default timeout in seconds (5 minutes)
+        'KEY_PREFIX': 'earthquake_',
+        'TIMEOUT': 60,  # Reduce to 1 minute for more real-time data
     }
 }
 
@@ -125,15 +125,26 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
-CELERY_TASK_SOFT_TIME_LIMIT = 60 * 5  # 5 minutes
-CELERY_TASK_TIME_LIMIT = 60 * 10  # 10 minutes
+CELERY_TASK_SOFT_TIME_LIMIT = 20 
+CELERY_TASK_TIME_LIMIT = 30 
 CELERY_TASK_ALWAYS_EAGER = DEBUG
+CELERY_TASK_TRACK_STARTED = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Control task distribution
+
+# Add health check URLs
+HEALTH_CHECK = {
+    'DISK_USAGE_MAX': 90,  # Percentage
+    'MEMORY_MIN': 100,  # MB
+}
 
 # Celery Beat settings
 CELERY_BEAT_SCHEDULE = {
     'fetch_earthquake_data': {
         'task': 'earthquake_app.tasks.fetch_earthquake_data',
-        'schedule': timedelta(minutes=10),
+        'schedule': timedelta(minutes=1),  # Reduce to 1 minute
+        'options': {
+            'expires': 55  # Ensure tasks don't overlap
+        }
     },
 }
 
@@ -264,3 +275,10 @@ SESSION_CACHE_ALIAS = "default"
 
 # Static Files Settings
 WHITENOISE_MAX_AGE = 31536000  # 1 year
+
+
+
+# Add these settings
+CHANNEL_LAYERS_MAX_CONNECTIONS = 1000
+CHANNEL_LAYERS_CAPACITY = 100
+ASGI_APPLICATION = "earthquake_warning.asgi.application"  # Make sure this is set

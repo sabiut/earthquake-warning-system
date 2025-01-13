@@ -48,6 +48,6 @@ COPY entrypoint.sh /app/
 RUN chmod +x /app/entrypoint.sh
 
 # Make sure the Python path includes our application
-ENV PYTHONPATH=/app:$PYTHONPATH
+ENV PYTHONPATH=/app
 
 ENTRYPOINT ["/app/entrypoint.sh"]
