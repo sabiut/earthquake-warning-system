@@ -6,6 +6,8 @@ from django.db import transaction
 from .models import Earthquake
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from .predictions import EarthquakePredictionService
+
 
 logger = logging.getLogger(__name__)
 
@@ -108,3 +110,20 @@ def fetch_earthquake_data():
         logger.error(f"❌ Error fetching earthquake data: {e}")
     except Exception as e:
         logger.error(f"❌ Unexpected error in Celery task: {e}")
+
+
+@shared_task(time_limit=300, soft_time_limit=270)
+def run_earthquake_predictions():
+    """
+    Runs the earthquake prediction using the trained LSTM model.
+    """
+    logger.info("🔮 Running LSTM earthquake prediction task...")
+
+    try:
+        # Create an instance of the service and call the method
+        prediction_service = EarthquakePredictionService()
+        prediction_service.predict_future_earthquakes()
+
+        logger.info("✅ Future earthquakes predicted and stored in the database.")
+    except Exception as e:
+        logger.error(f"❌ Error in prediction task: {e}")

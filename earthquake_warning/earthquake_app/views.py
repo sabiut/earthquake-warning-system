@@ -171,6 +171,37 @@ def dashboard_data(request):
             'detail': str(e)
         }, status=500)
     
+def get_predicted_earthquakes(request):
+    """
+    API view to return the predicted earthquakes.
+    """
+    try:
+        predictions = Earthquake.objects.filter(status="predicted").order_by("time")
+        
+        # Debugging: Check if any predictions exist
+        count = predictions.count()
+        logger.info(f"🔍 Found {count} predicted earthquakes.")
+
+        data = [
+            {
+                "id": quake.id,
+                "latitude": quake.latitude,
+                "longitude": quake.longitude,
+                "magnitude": quake.magnitude,
+                "depth": quake.depth,
+                "time": quake.time.isoformat(),
+                "place": quake.place,
+                "status": quake.status
+            }
+            for quake in predictions
+        ]
+
+        return JsonResponse({"predictions": data})
+
+    except Exception as e:
+        logger.error(f"Error fetching earthquake predictions: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
+
 
 
 class AlertsView(ListView):

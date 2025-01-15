@@ -6,6 +6,7 @@ class Earthquake(models.Model):
         ('alert', 'Alert'),
         ('warning', 'Warning'),
         ('safe', 'Safe'),
+        ('predicted', 'Predicted'),  # Added predicted status
     ]
 
     usgs_id = models.CharField(max_length=100, unique=True)
@@ -20,7 +21,6 @@ class Earthquake(models.Model):
     
     is_alert_sent = models.BooleanField(default=False)
     
-    # New status field
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='safe')
 
     @classmethod
@@ -29,13 +29,14 @@ class Earthquake(models.Model):
         return cls.objects.filter(time__gte=two_years_ago).order_by('-magnitude')
 
     def save(self, *args, **kwargs):
-        """Automatically assign status based on magnitude."""
-        if self.magnitude >= 5.0:
-            self.status = 'alert'
-        elif self.magnitude >= 3.0:
-            self.status = 'warning'
-        else:
-            self.status = 'safe'
+        """Automatically assign status based on magnitude unless it's a prediction."""
+        if self.status != 'predicted':  # Only auto-assign status for real earthquakes
+            if self.magnitude >= 5.0:
+                self.status = 'alert'
+            elif self.magnitude >= 3.0:
+                self.status = 'warning'
+            else:
+                self.status = 'safe'
         super().save(*args, **kwargs)
 
     def __str__(self):

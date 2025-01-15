@@ -1,5 +1,7 @@
 import os
 from celery import Celery
+import requests
+
 
 # Set the default Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'earthquake_warning.settings')
