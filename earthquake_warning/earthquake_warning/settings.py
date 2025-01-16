@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'earthquake_app',
     'channels',
+    'earthquakepredictions',
 ]
 
 MIDDLEWARE = [
@@ -144,6 +145,13 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': timedelta(minutes=1),  # Reduce to 1 minute
         'options': {
             'expires': 55  # Ensure tasks don't overlap
+        }
+    },
+    'run_earthquake_predictions': {  # Add this block
+        'task': 'earthquake_app.tasks.run_earthquake_predictions',
+        'schedule': timedelta(hours=6),  # Run every 6 hours
+        'options': {
+            'expires': 21500  # ~6 hours in seconds minus some buffer
         }
     },
 }

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-6">Earthquake Predictions Dashboard</h1>
+    
+    <!-- Time Series Chart -->
+    <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+        <h2 class="text-xl font-semibold mb-4">Predicted Earthquake Magnitudes Over Time</h2>
+        <canvas id="predictionTimeSeriesChart" style="height: 300px;"></canvas>
+    </div>
+
+    <!-- Leaflet Map -->
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+        <h2 class="text-xl font-semibold mb-4">Geographic Distribution</h2>
+        <div id="predictionsMap" style="height: 500px;"></div>
+    </div>
+</div>
+
+<!-- Include Leaflet CSS and JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+<script>
+let chartInstance = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const predictionsData = {{ predictions_json|safe }};
+    console.log("Data:", predictionsData);
+    
+    if (!predictionsData || !predictionsData.predictions || predictionsData.predictions.length === 0) {
+        console.log("No data available");
+        return;
+    }
+
+    // Initialize map
+    const map = L.map('predictionsMap').setView([0, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Add markers
+    const markers = [];
+    for (const p of predictionsData.predictions) {
+        if (p.latitude && p.longitude) {
+            const marker = L.circle([p.latitude, p.longitude], {
+                radius: p.magnitude * 10000,
+                color: '#2563eb'
+            }).bindPopup(`
+                <strong>${p.place}</strong><br>
+                Magnitude: ${p.magnitude.toFixed(2)}<br>
+                Time: ${new Date(p.time).toLocaleDateString()}<br>
+                Depth: ${p.depth.toFixed(2)} km
+            `).addTo(map);
+            markers.push(marker);
+        }
+    }
+
+    // Fit bounds
+    if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds());
+    }
+
+    // Initialize chart
+    const ctx = document.getElementById('predictionTimeSeriesChart').getContext('2d');
+    const data = predictionsData.predictions
+        .sort((a, b) => new Date(a.time) - new Date(b.time))
+        .map(p => ({
+            x: new Date(p.time),
+            y: p.magnitude,
+            place: p.place 
+        }));
+
+    chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Magnitude',
+                data: data,
+                borderColor: '#2563eb',
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'day',
+                        displayFormats: {
+                        day: 'MMM d'
+                    }
+                    }
+                }
+            },
+            plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const point = context.raw;
+                        return [
+                            `Magnitude: ${point.y.toFixed(2)}`,
+                            `Location: ${point.place}`
+                        ];
+                    }
+                }
+            }
+        }
+        }
+    });
+});
+
+</script>
+
+<style>
+#predictionsMap {
+    height: 500px !important;
+    width: 100% !important;
+}
+</style>
+{% endblock %}

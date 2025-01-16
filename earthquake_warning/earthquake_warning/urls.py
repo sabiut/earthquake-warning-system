@@ -10,6 +10,7 @@ from earthquake_app.routing import websocket_urlpatterns
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('earthquake_app.urls')),  # Include your app's regular views
+    path('', include('earthquakepredictions.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # Add ASGI WebSockets routing
